@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    :root { --pdsi-blue: #00549c; --pdsi-red: #ed1c24; --bg-gradient: linear-gradient(135deg, #00549c 0%, #002d54 100%); }
+    body { background-color: #f1f5f9; font-family: 'Inter', sans-serif; font-size: 11px; overflow-x: hidden; }
+    
+    /* LOGIN UI */
+    #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-gradient); z-index: 9999; display: flex; align-items: center; justify-content: center; }
+    .login-card { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.2); width: 350px; text-align: center; }
+    .custom-logo { width: 70px; height: 70px; background: white; border-radius: 18px; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; box-shadow: 0 8px 15px rgba(0,0,0,0.1); border: 2px solid #f1f5f9; }
+    .custom-logo i { font-size: 35px; background: linear-gradient(to bottom, var(--pdsi-red), #b31217); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+    /* SIDEBAR */
+    #sidebar { position: fixed; left: 0; top: 0; height: 100%; width: 240px; background: white; border-right: 1px solid #e2e8f0; z-index: 1000; transition: 0.3s; }
+    #sidebar.minimized { width: 70px; }
+    .sidebar-header { background: var(--pdsi-blue); color: white; padding: 18px; font-weight: bold; display: flex; align-items: center; justify-content: space-between; }
+    .nav-link-custom { display: flex; align-items: center; padding: 12px 20px; color: #64748b; text-decoration: none; cursor: pointer; border-left: 4px solid transparent; white-space: nowrap; }
+    .nav-link-custom.active { background: #f1f5f9; color: var(--pdsi-red); border-left-color: var(--pdsi-red); font-weight: bold; }
+    
+    #main-content { margin-left: 240px; padding: 25px; display: none; transition: 0.3s; }
+    #main-content.expanded { margin-left: 70px; }
+    .card-custom { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 20px; border: none; }
+    
+    /* TABLE STYLING */
+    .table-responsive { font-size: 10px; border-radius: 8px; }
+    table th { background-color: #f8fafc !important; white-space: nowrap; color: var(--pdsi-blue); }
+    table td { white-space: nowrap; vertical-align: middle; }
+    .search-box { position: relative; margin-bottom: 15px; }
+    .search-box i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8; }
+    .search-box input { padding-left: 35px; border-radius: 8px; font-size: 12px; }
+
+    /* PRINT & SIGNATURE */
+    .signature-wrapper { margin-top: 50px; display: none; }
+    .sig-container { display: flex; justify-content: space-between; text-align: center; margin-top: 40px; }
+    .sig-box { width: 250px; }
+    .sig-space { height: 70px; }
+    .sig-name { font-weight: bold; text-decoration: underline; }
+
+    @media print { 
+      .no-print { display: none !important; } 
+      #main-content { margin-left: 0 !important; padding: 0 !important; } 
+      .card-custom { box-shadow: none; border: none; }
+      .signature-wrapper { display: block !important; }
+      body { background-color: white; }
+      table { font-size: 8px !important; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="login-overlay">
+  <div class="login-card">
+    <div class="custom-logo"><i class="bi bi-fuel-pump-fill"></i></div>
+    <h5 class="fw-bold">Monitoring BBM</h5>
+    <span class="text-muted small mb-4 d-block">Fuel Inventory Management System</span>
+    <div class="form-floating mb-2 text-start"><input type="text" id="user" class="form-control" placeholder="User"><label>Username</label></div>
+    <div class="form-floating mb-4 text-start"><input type="password" id="pass" class="form-control" placeholder="Pass"><label>Password</label></div>
+    <button class="btn btn-danger w-100 py-2 fw-bold" onclick="handleLogin()">MASUK KE SISTEM</button>
+    <div id="login-msg" class="text-danger mt-3 small fw-bold"></div>
+  </div>
+</div>
+
+<div id="sidebar" class="no-print">
+  <div class="sidebar-header"><span class="sidebar-text">MONITORING LAPORAN BBM</span><i class="bi bi-list fs-4 cursor-pointer" onclick="toggleSidebar()"></i></div>
+  <div class="nav flex-column mt-3">
+    <div class="nav-link-custom active" onclick="switchTab('info-pane', this); loadDashboard()"><i class="bi bi-speedometer2 me-3"></i> <span class="sidebar-text">Dashboard</span></div>
+    <div class="nav-link-custom" onclick="setMode('input'); switchTab('input-pane', this)"><i class="bi bi-pencil-square me-3"></i> <span class="sidebar-text">Input Data</span></div>
+    <div class="nav-link-custom" onclick="switchTab('data-pane', this); refreshTable('Riwayat')"><i class="bi bi-table me-3"></i> <span class="sidebar-text">Riwayat</span></div>
+    <div class="nav-link-custom" onclick="setMode('edit'); switchTab('input-pane', this)"><i class="bi bi-pencil-fill me-3"></i> <span class="sidebar-text">Change Data</span></div>
+    <div class="nav-link-custom" onclick="switchTab('delete-pane', this); refreshTable('Delete')"><i class="bi bi-trash3-fill me-3"></i> <span class="sidebar-text">Delete Data</span></div>
+    <div class="nav-link-custom" onclick="switchTab('print-pane', this); refreshTable('Print')"><i class="bi bi-printer-fill me-3"></i> <span class="sidebar-text">Print Report</span></div>
+    <div class="nav-link-custom" onclick="switchTab('user-pane', this)"><i class="bi bi-person-gear me-3"></i> <span class="sidebar-text">Account</span></div>
+    <hr>
+    <div class="nav-link-custom text-danger" onclick="handleLogout()"><i class="bi bi-box-arrow-left me-3"></i> <span class="sidebar-text">Logout</span></div>
+  </div>
+</div>
+
+<div id="main-content">
+  
+  <div id="info-pane" class="tab-pane-custom no-print">
+    <div class="row g-3 text-center mb-4">
+      <div class="col-md-4"><div class="card-custom"><h6>TOTAL LITER</h6><h4 id="statLiter" class="fw-bold text-primary">0 Ltr</h4></div></div>
+      <div class="col-md-4"><div class="card-custom"><h6>TOTAL BIAYA</h6><h4 id="statCost" class="fw-bold text-danger">Rp 0</h4></div></div>
+      <div class="col-md-4"><div class="card-custom"><h6>UNIT AKTIF</h6><h4 id="statUnit" class="fw-bold text-success">0 Unit</h4></div></div>
+    </div>
+    <div class="row"><div class="col-md-5"><div class="card-custom"><canvas id="bbmPieChart"></canvas></div></div><div class="col-md-7"><div class="card-custom"><canvas id="vehicleBarChart"></canvas></div></div></div>
+  </div>
+
+  <div id="input-pane" class="tab-pane-custom no-print" style="display:none;">
+    <div class="card-custom">
+      <h5 id="formTitle" class="fw-bold mb-4 text-primary">INPUT DATA BARU</h5>
+      <form id="formBBM">
+        <div class="row g-3">
+          <div class="col-md-3"><label class="fw-bold">Voucher</label><select name="kodeVoucher" id="kodeVoucherDropdown" class="form-select" onchange="checkEditMode(this.value)" required><option value="">Pilih...</option></select></div>
+          <div class="col-md-3"><label class="fw-bold">Hari</label><select name="hari" id="inHari" class="form-select"><option>Senin</option><option>Selasa</option><option>Rabu</option><option>Kamis</option><option>Jumat</option><option>Sabtu</option><option>Minggu</option></select></div>
+          <div class="col-md-3"><label class="fw-bold">Tanggal</label><input type="date" name="tanggal" id="inTanggal" class="form-control" required></div>
+          <div class="col-md-3"><label class="fw-bold">Unit</label><select name="jenisKendaraan" id="inKendaraan" class="form-select"><option>KRP SINGLE CABIN</option><option>KRP DOUBLE CABIN</option><option>KRP PAJERO</option><option>KRP FORTUNER</option><option>KRP LIGHT TRUCK</option><option>KRP INOVA</option><option>KRP ELF</option></select></div>
+          <div class="col-md-3"><label class="fw-bold">Plate</label><input type="text" name="plate" id="inPlate" class="form-control"></div>
+          <div class="col-md-3"><label class="fw-bold">Odometer</label><input type="number" name="odometer" id="inOdo" class="form-control"></div>
+          <div class="col-md-3"><label class="fw-bold">Liter</label><input type="number" step="0.01" id="inputLiter" name="liter" class="form-control"></div>
+          <div class="col-md-3"><label class="fw-bold">BBM</label><select name="jenisBBM" id="inBBM" class="form-select"><option>DEXLITE</option><option>PERTADEX</option></select></div>
+          <div class="col-md-3"><label class="fw-bold">Nett</label><input type="number" id="inputNett" name="nettPrice" class="form-control"></div>
+          <div class="col-md-3"><label class="fw-bold text-primary">Total Harga</label><input type="number" id="inputTotal" name="totalPrice" class="form-control bg-light" readonly></div>
+          <div class="col-md-3"><label class="fw-bold">Nama Driver</label><input type="text" name="namaDriver" id="inDriver" class="form-control"></div>
+          <div class="col-md-3"><label class="fw-bold">Asal Fungsi</label><input type="text" name="dariFungsi" id="inAsal" class="form-control"></div>
+          <div class="col-md-6"><label class="fw-bold">Fungsi Dilayani</label><input type="text" name="fungsiDilayani" id="inLayanan" class="form-control"></div>
+          <div class="col-md-6"><label class="fw-bold">Keperluan</label><input type="text" name="keperluan" id="inKeperluan" class="form-control"></div>
+        </div>
+        <div class="text-end mt-4"><button type="submit" id="btnSimpan" class="btn btn-danger px-5 fw-bold">SIMPAN DATA</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div id="data-pane" class="tab-pane-custom no-print" style="display:none;">
+    <div class="card-custom">
+      <h6>Riwayat Transaksi Lengkap</h6>
+      <div class="search-box mt-3"><i class="bi bi-search"></i><input type="text" class="form-control" id="searchRiwayat" placeholder="Cari Voucher, Unit, Driver..." onkeyup="filterTable('Riwayat')"></div>
+      <div class="table-responsive"><table class="table table-hover table-bordered mt-2"><thead id="theadRiwayat"></thead><tbody id="tbodyRiwayat"></tbody></table></div>
+    </div>
+  </div>
+
+  <div id="delete-pane" class="tab-pane-custom no-print" style="display:none;">
+    <div class="card-custom">
+      <h6 class="text-danger">Hapus Transaksi</h6>
+      <div class="search-box mt-3"><i class="bi bi-search"></i><input type="text" class="form-control" id="searchDelete" placeholder="Cari data untuk dihapus..." onkeyup="filterTable('Delete')"></div>
+      <div class="table-responsive"><table class="table table-hover table-bordered mt-2"><thead id="theadDelete"></thead><tbody id="tbodyDelete"></tbody></table></div>
+    </div>
+  </div>
+
+  <div id="print-pane" class="tab-pane-custom" style="display:none;">
+    <div class="card-custom">
+      <div class="text-center mb-3">
+        <h5 class="fw-bold">LAPORAN MONITORING PENGGUNAAN BBM</h5>
+        <h6 class="text-secondary">PERTAMINA DRILLING SERVICES INDONESIA</h6>
+        <hr>
+      </div>
+      <div class="d-flex justify-content-between mb-3 no-print">
+        <h6>Preview Cetak</h6>
+        <button class="btn btn-dark btn-sm" onclick="window.print()"><i class="bi bi-printer"></i> Print / Save PDF</button>
+      </div>
+      <div class="search-box mt-3 no-print"><i class="bi bi-search"></i><input type="text" class="form-control" id="searchPrint" placeholder="Filter data laporan..." onkeyup="filterTable('Print')"></div>
+      <div class="table-responsive"><table class="table table-bordered table-sm mt-2 border-dark"><thead id="theadPrint"></thead><tbody id="tbodyPrint"></tbody></table></div>
+      
+      <div class="signature-wrapper">
+        <div class="text-end mb-4"><p>Prabumulih, <span id="currentDate"></span></p></div>
+        <div class="sig-container">
+          <div class="sig-box"><p>Dibuat Oleh:</p><p>Assisten Inventory</p><div class="sig-space"></div><p class="sig-name">( Rusman Bin Kisan )</p></div>
+          <div class="sig-box"><p>Mengetahui:</p><p>Manager Rig Operation II</p><div class="sig-space"></div><p class="sig-name">( Wisnu Adi Nugroho )</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="user-pane" class="tab-pane-custom no-print" style="display:none;">
+    <div class="row g-3">
+      <div class="col-md-6"><div class="card-custom"><h6>Tambah Admin Baru</h6><input type="text" id="newU" class="form-control mb-2" placeholder="Username"><input type="password" id="newP" class="form-control mb-2" placeholder="Password"><button class="btn btn-primary btn-sm w-100" onclick="doCreateUser()">Buat User</button></div></div>
+      <div class="col-md-6"><div class="card-custom"><h6>Ganti Password</h6><input type="password" id="oldP" class="form-control mb-2" placeholder="Password Lama"><input type="password" id="newPass" class="form-control mb-2" placeholder="Password Baru"><button class="btn btn-warning btn-sm w-100" onclick="doChangePass()">Simpan Password</button></div></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+  let allRawData = [], bbmChart, vehicleChart, editMode = false;
+
+  function handleLogin() {
+    const u = $("#user").val(), p = $("#pass").val();
+    $("#login-msg").text("Memverifikasi...");
+    google.script.run.withSuccessHandler(res => {
+      if (res.success) {
+        sessionStorage.setItem("pdsi_login", "true");
+        sessionStorage.setItem("pdsi_user", res.user);
+        $("#login-overlay").fadeOut(); $("#main-content").fadeIn();
+        loadDashboard(); initVouchers();
+      } else { $("#login-msg").text(res.message); }
+    }).checkLogin(u, p);
+  }
+
+  function handleLogout() { sessionStorage.clear(); location.reload(); }
+  function toggleSidebar() { $('#sidebar').toggleClass('minimized'); $('#main-content').toggleClass('expanded'); $('.sidebar-text').toggle(); }
+
+  function switchTab(id, el) { 
+    $('.tab-pane-custom').hide(); $('#' + id).fadeIn(); 
+    $('.nav-link-custom').removeClass('active'); $(el).addClass('active'); 
+    if(id === 'print-pane') { refreshTable('Print'); updatePrintDate(); }
+  }
+
+  function refreshTable(target) {
+    google.script.run.withSuccessHandler(data => {
+      if(data.length === 0) return;
+      allRawData = data;
+      const headers = data[0], rows = data.slice(1);
+      let hHtml = "<tr>";
+      headers.forEach(h => hHtml += `<th>${h}</th>`);
+      if(target !== 'Print') hHtml += "<th>AKSI</th>";
+      hHtml += "</tr>";
+      $(`#thead${target}`).html(hHtml);
+      
+      let bHtml = "";
+      rows.forEach(r => {
+        bHtml += "<tr>";
+        r.forEach((c, i) => bHtml += `<td>${(i === 8) ? "Rp " + parseFloat(c).toLocaleString() : c}</td>`);
+        if(target === 'Riwayat') bHtml += `<td><button class="btn btn-xs btn-outline-primary" onclick="alert('Print Struk Individual')"><i class="bi bi-receipt"></i></button></td>`;
+        if(target === 'Delete') bHtml += `<td><button class="btn btn-xs btn-danger" onclick="doDelete('${r[0]}')"><i class="bi bi-trash"></i></button></td>`;
+        bHtml += "</tr>";
+      });
+      $(`#tbody${target}`).html(bHtml);
+    }).tampilkanData();
+  }
+
+  function filterTable(target) {
+    let input = document.getElementById(`search${target}`).value.toUpperCase();
+    let tr = document.getElementById(`tbody${target}`).getElementsByTagName("tr");
+    for (let i = 0; i < tr.length; i++) {
+      let found = false, td = tr[i].getElementsByTagName("td");
+      for (let j = 0; j < td.length; j++) { if (td[j].textContent.toUpperCase().indexOf(input) > -1) { found = true; break; } }
+      tr[i].style.display = found ? "" : "none";
+    }
+  }
+
+  function initVouchers() {
+    google.script.run.withSuccessHandler(l => {
+      $('#kodeVoucherDropdown').empty().append('<option value="">Pilih...</option>');
+      l.forEach(v => $('#kodeVoucherDropdown').append(`<option value="${v}">${v}</option>`));
+    }).getVoucherList();
+  }
+
+  function setMode(m) { 
+    editMode = (m === 'edit'); 
+    $('#formTitle').text(editMode ? 'UPDATE DATA BBM' : 'INPUT DATA BARU').toggleClass('text-danger', editMode);
+    $('#formBBM')[0].reset();
+    if(editMode) google.script.run.withSuccessHandler(d => allRawData = d).tampilkanData();
+  }
+
+  function checkEditMode(v) {
+    if (!editMode || !v) return;
+    const r = allRawData.find(x => x[0] === v);
+    if (r) {
+      $('#inHari').val(r[1]); $('#inTanggal').val(r[2]); $('#inKendaraan').val(r[3]);
+      $('#inPlate').val(r[4]); $('#inOdo').val(r[5]); $('#inputLiter').val(r[6]);
+      $('#inBBM').val(r[9]); $('#inputNett').val(r[7]); $('#inputTotal').val(r[8]);
+      $('#inDriver').val(r[10]); $('#inAsal').val(r[11]); $('#inLayanan').val(r[12]); $('#inKeperluan').val(r[13]);
+    }
+  }
+
+  $('#inputLiter, #inputNett').on('input', () => { $('#inputTotal').val($('#inputLiter').val() * $('#inputNett').val()); });
+
+  $('#formBBM').submit(function(e) {
+    e.preventDefault();
+    const d = {}; new FormData(this).forEach((v, k) => d[k] = v);
+    google.script.run.withSuccessHandler(res => { alert(res); setMode('input'); loadDashboard(); })[editMode ? 'updateData' : 'simpanData'](d);
+  });
+
+  function doDelete(v) { if(confirm("Hapus "+v+"?")) google.script.run.withSuccessHandler(res => { alert(res); refreshTable('Delete'); }).hapusData(v); }
+
+  function loadDashboard() {
+    google.script.run.withSuccessHandler(res => {
+      if(!res) return;
+      $('#statLiter').text(res.totalLiter.toFixed(2) + " Ltr");
+      $('#statCost').text("Rp " + res.totalCost.toLocaleString());
+      $('#statUnit').text(res.totalUnit + " Unit");
+      if (bbmChart) bbmChart.destroy();
+      bbmChart = new Chart($('#bbmPieChart'), { type: 'pie', data: { labels: res.bbmLabels, datasets: [{ data: res.bbmValues, backgroundColor: ['#ed1c24', '#00549c', '#34d399', '#fbbf24'] }] } });
+      if (vehicleChart) vehicleChart.destroy();
+      vehicleChart = new Chart($('#vehicleBarChart'), { type: 'bar', data: { labels: res.vehicleLabels, datasets: [{ label: 'Unit', data: res.vehicleValues, backgroundColor: '#3b82f6' }] } });
+    }).getDashboardData();
+  }
+
+  function updatePrintDate() {
+    const options = { day: 'numeric', month: 'long', year: 'numeric' };
+    document.getElementById('currentDate').innerText = new Date().toLocaleDateString('id-ID', options);
+  }
+
+  function doCreateUser() { google.script.run.withSuccessHandler(res => alert(res)).createNewUser($("#newU").val(), $("#newP").val()); }
+  function doChangePass() { google.script.run.withSuccessHandler(res => alert(res)).changePassword(sessionStorage.getItem("pdsi_user"), $("#oldP").val(), $("#newPass").val()); }
+</script>
+</body>
+</html>
